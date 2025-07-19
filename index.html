@@ -1,33 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Javascript Tetris</title>
+  <meta charset="UTF-8">
+  <title>Wellie Tetris</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     body {
       font-family: Helvetica, sans-serif;
       margin: 0;
       padding: 0;
+      background-color: #000;
+      color: #fff;
       display: flex;
       justify-content: center;
       align-items: center;
+      flex-direction: column;
       min-height: 100vh;
-      background-color: #f0f0f0;
-      touch-action: manipulation; /* Prevent default touch behaviors like pinch-zoom */
+      touch-action: manipulation;
+    }
+    h1 {
+      font-size: 2rem;
+      margin: 1rem 0 0.5rem;
+      color: #FFD700;
+      text-shadow: 2px 2px #222;
     }
     #tetris {
       padding: 1em;
-      border: 4px solid black;
+      border: 4px solid #444;
       border-radius: 10px;
-      background-color: #F8F8F8;
+      background-color: #1a1a1a;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     #canvas {
-      background-color: #333; /* Fallback background */
-      box-shadow: 10px 10px 10px #999;
-      border: 2px solid #333;
+      background-color: #222;
+      box-shadow: 0 0 10px #666;
+      border: 2px solid #555;
       width: 100%;
       max-width: 100%;
     }
@@ -43,14 +52,15 @@
     }
     #menu p a {
       text-decoration: none;
-      color: black;
+      color: #FFD700;
+      font-weight: bold;
     }
     #upcoming {
-      background-color: #E0E0E0;
+      background-color: #333;
       margin-bottom: 1em;
     }
     #score { color: red; font-weight: bold; }
-    #rows { color: blue; font-weight: bold; }
+    #rows { color: cyan; font-weight: bold; }
     #controls {
       display: flex;
       flex-wrap: wrap;
@@ -61,7 +71,7 @@
     .control-btn {
       padding: 10px 20px;
       font-size: 1em;
-      background-color: #333;
+      background-color: #555;
       color: white;
       border: none;
       border-radius: 5px;
@@ -69,10 +79,8 @@
       touch-action: manipulation;
     }
     .control-btn:active {
-      background-color: #555;
+      background-color: #777;
     }
-
-    /* Responsive design */
     @media screen and (max-width: 400px) {
       #tetris { font-size: 0.75em; width: 90vw; }
       #canvas { width: 30vw; height: 60vw; }
@@ -90,8 +98,8 @@
     }
   </style>
 </head>
-
 <body>
+  <h1>🏴‍☠️ Wellie Tetris</h1>
   <div id="tetris">
     <canvas id="canvas">Sorry, your browser does not support the canvas element.</canvas>
     <div id="menu">
@@ -100,24 +108,26 @@
       <p>Score: <span id="score">00000</span></p>
       <p>Rows: <span id="rows">0</span></p>
       <div id="controls">
-        <button class="control-btn" onclick="handleTouch('left')">Left</button>
-        <button class="control-btn" onclick="handleTouch('right')">Right</button>
-        <button class="control-btn" onclick="handleTouch('rotate')">Rotate</button>
-        <button class="control-btn" onclick="handleTouch('down')">Down</button>
+        <button class="control-btn" onclick="handleTouch('left')">⬅️ Left</button>
+        <button class="control-btn" onclick="handleTouch('right')">➡️ Right</button>
+        <button class="control-btn" onclick="handleTouch('rotate')">⟳ Rotate</button>
+        <button class="control-btn" onclick="handleTouch('down')">⬇️ Down</button>
       </div>
     </div>
   </div>
 
   <script>
+    "use strict";
+
     // Base helper methods
     function get(id) { return document.getElementById(id); }
     function hide(id) { get(id).style.display = 'none'; }
     function show(id) { get(id).style.display = 'block'; }
     function html(id, html) { get(id).innerHTML = html; }
 
-    function timestamp() { return new Date().getTime(); }
-    function random(min, max) { return (min + (Math.random() * (max - min))); }
-    function randomChoice(choices) { return choices[Math.round(random(0, choices.length-1))]; }
+    function timestamp() { return Date.now(); }
+    function random(min, max) { return min + Math.random() * (max - min); }
+    function randomChoice(choices) { return choices[Math.round(random(0, choices.length - 1))]; }
 
     if (!window.requestAnimationFrame) {
       window.requestAnimationFrame = window.webkitRequestAnimationFrame ||
@@ -128,29 +138,35 @@
     }
 
     // Game constants
-    var KEY = { ESC: 27, SPACE: 32, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40 },
-        DIR = { UP: 0, RIGHT: 1, DOWN: 2, LEFT: 3, MIN: 0, MAX: 3 },
-        canvas = get('canvas'),
-        ctx = canvas.getContext('2d'),
-        ucanvas = get('upcoming'),
-        uctx = ucanvas.getContext('2d'),
-        speed = { start: 0.6, decrement: 0.005, min: 0.1 },
-        nx = 10, ny = 20, nu = 5;
+    const KEY = { ESC: 27, SPACE: 32, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40 },
+          DIR = { UP: 0, RIGHT: 1, DOWN: 2, LEFT: 3, MIN: 0, MAX: 3 },
+          canvas = get('canvas'),
+          ctx = canvas ? canvas.getContext('2d') : null,
+          ucanvas = get('upcoming'),
+          uctx = ucanvas ? ucanvas.getContext('2d') : null,
+          speed = { start: 0.6, decrement: 0.005, min: 0.1 },
+          nx = 10, ny = 20, nu = 5;
+
+    // Check for canvas support
+    if (!canvas || !ctx || !ucanvas || !uctx) {
+      console.error('Canvas or context not found');
+      throw new Error('Canvas or context not found');
+    }
 
     // Game variables
-    var dx, dy, blocks, actions = [], playing, dt, current, next, score, vscore, rows, step;
+    let dx, dy, blocks, actions = [], playing, dt, current, next, score, vscore, rows, step;
 
     // Tetris pieces
-    var i = { size: 4, blocks: [0x0F00, 0x2222, 0x00F0, 0x4444], color: 'cyan' };
-    var j = { size: 3, blocks: [0x44C0, 0x8E00, 0x6440, 0x0E20], color: 'blue' };
-    var l = { size: 3, blocks: [0x4460, 0x0E80, 0xC440, 0x2E00], color: 'orange' };
-    var o = { size: 2, blocks: [0xCC00, 0xCC00, 0xCC00, 0xCC00], color: 'yellow' };
-    var s = { size: 3, blocks: [0x06C0, 0x8C40, 0x6C00, 0x4620], color: 'green' };
-    var t = { size: 3, blocks: [0x0E40, 0x4C40, 0x4E00, 0x4640], color: 'purple' };
-    var z = { size: 3, blocks: [0x0C60, 0x4C80, 0xC600, 0x2640], color: 'red' };
+    const i = { size: 4, blocks: [0x0F00, 0x2222, 0x00F0, 0x4444], color: 'cyan' };
+    const j = { size: 3, blocks: [0x44C0, 0x8E00, 0x6440, 0x0E20], color: 'blue' };
+    const l = { size: 3, blocks: [0x4460, 0x0E80, 0xC440, 0x2E00], color: 'orange' };
+    const o = { size: 2, blocks: [0xCC00, 0xCC00, 0xCC00, 0xCC00], color: 'yellow' };
+    const s = { size: 3, blocks: [0x06C0, 0x8C40, 0x6C00, 0x4620], color: 'green' };
+    const t = { size: 3, blocks: [0x0E40, 0x4C40, 0x4E00, 0x4640], color: 'purple' };
+    const z = { size: 3, blocks: [0x0C60, 0x4C80, 0xC600, 0x2640], color: 'red' };
 
     function eachblock(type, x, y, dir, fn) {
-      var bit, result, row = 0, col = 0, blocks = type.blocks[dir];
+      let bit, row = 0, col = 0, blocks = type.blocks[dir];
       for (bit = 0x8000; bit > 0; bit = bit >> 1) {
         if (blocks & bit) fn(x + col, y + row);
         if (++col === 4) { col = 0; ++row; }
@@ -158,7 +174,7 @@
     }
 
     function occupied(type, x, y, dir) {
-      var result = false;
+      let result = false;
       eachblock(type, x, y, dir, function(x, y) {
         if ((x < 0) || (x >= nx) || (y < 0) || (y >= ny) || getBlock(x, y))
           result = true;
@@ -166,129 +182,34 @@
       return result;
     }
 
-    function unoccupied(type, x, y, dir) { return !occupied(type, x, y, dir); }
+    function unoccupied(type, x, y, dir) {
+      return !occupied(type, x, y, dir);
+    }
 
-    var pieces = [];
+    let pieces = [];
     function randomPiece() {
       if (pieces.length === 0)
         pieces = [i, i, i, i, j, j, j, j, l, l, l, l, o, o, o, o, s, s, s, s, t, t, t, t, z, z, z, z];
-      var type = pieces.splice(random(0, pieces.length - 1), 1)[0];
-      return { type: type, dir: DIR.UP, x: Math.round(random(0, nx - type.size)), y: 0 };
+      return randomChoice(pieces.splice(0, 1))[0];
     }
 
-    // Game loop
-    function run() {
-      addEvents();
-      var last = now = timestamp();
-      function frame() {
-        now = timestamp();
-        update(Math.min(1, (now - last) / 1000.0));
-        draw();
-        last = now;
-        requestAnimationFrame(frame, canvas);
-      }
-      resize();
-      reset();
-      frame();
-    }
-
-    function addEvents() {
-      document.addEventListener('keydown', keydown, false);
-      window.addEventListener('resize', resize, false);
-      canvas.addEventListener('touchstart', touchStart, false);
-      canvas.addEventListener('touchmove', touchMove, false);
-      canvas.addEventListener('touchend', touchEnd, false);
-    }
-
-    function resize() {
-      canvas.width = canvas.clientWidth * window.devicePixelRatio;
-      canvas.height = canvas.clientHeight * window.devicePixelRatio;
-      ucanvas.width = ucanvas.clientWidth * window.devicePixelRatio;
-      ucanvas.height = ucanvas.clientHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      uctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      dx = canvas.width / nx / window.devicePixelRatio;
-      dy = canvas.height / ny / window.devicePixelRatio;
-      invalidate();
-      invalidateNext();
-    }
-
-    // Touch handling
-    var touchStartX, touchStartY;
-    function touchStart(ev) {
-      ev.preventDefault();
-      if (!playing) {
-        play();
-        return;
-      }
-      touchStartX = ev.touches[0].clientX;
-      touchStartY = ev.touches[0].clientY;
-    }
-
-    function touchMove(ev) {
-      ev.preventDefault();
-    }
-
-    function touchEnd(ev) {
-      ev.preventDefault();
-      if (!playing) return;
-      var touchEndX = ev.changedTouches[0].clientX;
-      var touchEndY = ev.changedTouches[0].clientY;
-      var dx = touchEndX - touchStartX;
-      var dy = touchEndY - touchStartY;
-      var absDx = Math.abs(dx);
-      var absDy = Math.abs(dy);
-
-      if (Math.max(absDx, absDy) > 20) {
-        if (absDx > absDy) {
-          actions.push(dx > 0 ? DIR.RIGHT : DIR.LEFT);
-        } else {
-          actions.push(dy > 0 ? DIR.DOWN : DIR.UP);
-        }
-      }
-    }
-
-    // On-screen button handling
-    function handleTouch(action) {
-      if (!playing) return;
-      switch (action) {
-        case 'left': actions.push(DIR.LEFT); break;
-        case 'right': actions.push(DIR.RIGHT); break;
-        case 'rotate': actions.push(DIR.UP); break;
-        case 'down': actions.push(DIR.DOWN); break;
-      }
-    }
-
-    function keydown(ev) {
-      var handled = false;
-      if (playing) {
-        switch (ev.keyCode) {
-          case KEY.LEFT: actions.push(DIR.LEFT); handled = true; break;
-          case KEY.RIGHT: actions.push(DIR.RIGHT); handled = true; break;
-          case KEY.UP: actions.push(DIR.UP); handled = true; break;
-          case KEY.DOWN: actions.push(DIR.DOWN); handled = true; break;
-          case KEY.ESC: lose(); handled = true; break;
-        }
-      } else if (ev.keyCode === KEY.SPACE) {
-        play();
-        handled = true;
-      }
-      if (handled) ev.preventDefault();
-    }
-
-    // Game logic
     function play() { hide('start'); reset(); playing = true; }
     function lose() { show('start'); setVisualScore(); playing = false; }
 
     function setVisualScore(n) { vscore = n || score; invalidateScore(); }
     function setScore(n) { score = n; setVisualScore(n); }
-    function addScore(n) { score = score + n; }
+    function addScore(n) { score += n; }
     function clearScore() { setScore(0); }
     function clearRows() { setRows(0); }
     function setRows(n) { rows = n; step = Math.max(speed.min, speed.start - (speed.decrement * rows)); invalidateRows(); }
     function addRows(n) { setRows(rows + n); }
+
     function getBlock(x, y) { return (blocks && blocks[x] ? blocks[x][y] : null); }
-    function setBlock(x, y, type) { blocks[x] = blocks[x] || []; blocks[x][y] = type; invalidate(); }
+    function setBlock(x, y, type) {
+      blocks[x] = blocks[x] || [];
+      blocks[x][y] = type;
+      invalidate();
+    }
     function clearBlocks() { blocks = []; invalidate(); }
     function clearActions() { actions = []; }
     function setCurrentPiece(piece) { current = piece || randomPiece(); invalidate(); }
@@ -326,7 +247,7 @@
     }
 
     function move(dir) {
-      var x = current.x, y = current.y;
+      let x = current.x, y = current.y;
       switch (dir) {
         case DIR.RIGHT: x = x + 1; break;
         case DIR.LEFT: x = x - 1; break;
@@ -342,7 +263,7 @@
     }
 
     function rotate() {
-      var newdir = (current.dir === DIR.MAX ? DIR.MIN : current.dir + 1);
+      let newdir = (current.dir === DIR.MAX ? DIR.MIN : current.dir + 1);
       if (unoccupied(current.type, current.x, current.y, newdir)) {
         current.dir = newdir;
         invalidate();
@@ -355,7 +276,7 @@
         dropPiece();
         removeLines();
         setCurrentPiece(next);
-        setNextPiece(randomPiece());
+        setNextPiece();
         clearActions();
         if (occupied(current.type, current.x, current.y, current.dir)) {
           lose();
@@ -370,15 +291,14 @@
     }
 
     function removeLines() {
-      var x, y, complete, n = 0;
-      for (y = ny; y > 0; --y) {
+      let x, y, complete, n = 0;
+      for (y = ny - 1; y >= 0; y--) {
         complete = true;
-        for (x = 0; x < nx; ++x) {
+        for (x = 0; x < nx; x++) {
           if (!getBlock(x, y)) complete = false;
         }
         if (complete) {
           removeLine(y);
-          y = y + 1;
           n++;
         }
       }
@@ -389,15 +309,15 @@
     }
 
     function removeLine(n) {
-      var x, y;
-      for (y = n; y >= 0; --y) {
-        for (x = 0; x < nx; ++x)
-          setBlock(x, y, (y === 0) ? null : getBlock(x, y - 1));
+      for (let y = n; y >= 0; y--) {
+        for (let x = 0; x < nx; x++) {
+          setBlock(x, y, y === 0 ? null : getBlock(x, y - 1));
+        }
       }
     }
 
     // Rendering
-    var invalid = {};
+    let invalid = {};
 
     function invalidate() { invalid.court = true; }
     function invalidateNext() { invalid.next = true; }
@@ -420,7 +340,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (playing)
           drawPiece(ctx, current.type, current.x, current.y, current.dir);
-        var x, y, block;
+        let x, y, block;
         for (y = 0; y < ny; y++) {
           for (x = 0; x < nx; x++) {
             if (block = getBlock(x, y))
@@ -434,7 +354,7 @@
 
     function drawNext() {
       if (invalid.next) {
-        var padding = (nu - next.type.size) / 2;
+        let padding = (nu - next.type.size) / 2;
         uctx.save();
         uctx.translate(0.5, 0.5);
         uctx.clearRect(0, 0, nu * dx, nu * dy);
@@ -469,10 +389,120 @@
     function drawBlock(ctx, x, y, color) {
       ctx.fillStyle = color;
       ctx.fillRect(x * dx, y * dy, dx, dy);
+      ctx.strokeStyle = '#000';
       ctx.strokeRect(x * dx, y * dy, dx, dy);
     }
 
-    // Start the game
+    // Controls
+    function handleTouch(action) {
+      if (!playing) return;
+      switch (action) {
+        case 'left': actions.push(DIR.LEFT); break;
+        case 'right': actions.push(DIR.RIGHT); break;
+        case 'rotate': actions.push(DIR.UP); break;
+        case 'down': actions.push(DIR.DOWN); break;
+      }
+    }
+
+    function keydown(ev) {
+      let handled = false;
+      if (playing) {
+        switch (ev.keyCode) {
+          case KEY.LEFT: actions.push(DIR.LEFT); handled = true; break;
+          case KEY.RIGHT: actions.push(DIR.RIGHT); handled = true; break;
+          case KEY.UP: actions.push(DIR.UP); handled = true; break;
+          case KEY.DOWN: actions.push(DIR.DOWN); handled = true; break;
+          case KEY.ESC: lose(); handled = true; break;
+        }
+      } else if (ev.keyCode === KEY.SPACE) {
+        play();
+        handled = true;
+      }
+      if (handled) ev.preventDefault();
+    }
+
+    // Touch Events
+    let touchStartX, touchStartY, touchStartTime;
+
+    function touchStart(ev) {
+      if (ev.touches.length !== 1) return;
+      ev.preventDefault();
+      if (!playing) {
+        play();
+        return;
+      }
+      touchStartX = ev.touches[0].clientX;
+      touchStartY = ev.touches[0].clientY;
+      touchStartTime = timestamp();
+    }
+
+    function touchMove(ev) {
+      if (ev.touches.length !== 1) return;
+      ev.preventDefault();
+    }
+
+    function touchEnd(ev) {
+      if (ev.changedTouches.length !== 1) return;
+      ev.preventDefault();
+      if (!playing) return;
+      const touchEndX = ev.changedTouches[0].clientX;
+      const touchEndY = ev.changedTouches[0].clientY;
+      const dx = touchEndX - touchStartX;
+      const dy = touchEndY - touchStartY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      const duration = timestamp() - touchStartTime;
+
+      if (duration < 200 && absDx < 20 && absDy < 20) {
+        actions.push(DIR.UP); // tap = rotate
+      } else if (absDx > absDy && absDx > 20) {
+        actions.push(dx > 0 ? DIR.RIGHT : DIR.LEFT);
+      } else if (absDy > 20) {
+        actions.push(dy > 0 ? DIR.DOWN : DIR.UP);
+      }
+    }
+
+    // Resize and Start
+    function resize() {
+      canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.clientHeight * window.devicePixelRatio;
+      ucanvas.width = ucanvas.clientWidth * window.devicePixelRatio;
+      ucanvas.height = ucanvas.clientHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      uctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      dx = canvas.width / nx / window.devicePixelRatio;
+      dy = canvas.height / ny / window.devicePixelRatio;
+      invalidate();
+      invalidateNext();
+    }
+
+    function addEvents() {
+      document.addEventListener('keydown', keydown, false);
+      window.addEventListener('resize', resize, false);
+      canvas.addEventListener('touchstart', touchStart, false);
+      canvas.addEventListener('touchmove', touchMove, false);
+      canvas.addEventListener('touchend', touchEnd, false);
+      // Only add click event if touch events are not supported
+      if (!('ontouchstart' in window)) {
+        canvas.addEventListener('click', () => { if (!playing) play(); }, false);
+      }
+    }
+
+    function run() {
+      addEvents();
+      let last = timestamp();
+      function frame() {
+        let now = timestamp();
+        update(Math.min(1, (now - last) / 1000));
+        draw();
+        last = now;
+        requestAnimationFrame(frame);
+      }
+      resize();
+      reset();
+      frame();
+    }
+
     run();
   </script>
 </body>
